@@ -1,0 +1,92 @@
+#!/usr/bin/java --source 11
+
+import java.io.File;
+import java.io.PrintStream;
+import java.net.*;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.stream.Stream;
+
+public class Main {
+    public static void main(String[] args) {
+        PrintStream out = System.out;
+        try {
+
+            if (args.length == 0) {
+                System.out.println("Provide a URL");
+                return;
+            }
+
+            String method = "GET";
+
+            String body;
+
+            HttpRequest.BodyPublisher bodyPublisher = HttpRequest.BodyPublishers.noBody();
+
+            String arguments = String.join(" ", args);
+
+            String[] flags = arguments.split("-");
+
+            boolean isVerbose = false;
+
+            for (String flag : flags) {
+                if (flag.trim().toLowerCase().startsWith("m")) {
+                    method = flag.split(" ")[1].trim();
+                }
+
+                if (flag.trim().toLowerCase().startsWith("b")) {
+                    body = flag.substring(1).trim();
+                    bodyPublisher = HttpRequest.BodyPublishers.ofString(body);
+                }
+
+                if (flag.trim().toLowerCase().startsWith("d")) {
+                    String providedName = flag.substring(1).trim();
+                    String[] entries = args[0].split("/");
+                    String nameFromUrl = entries[entries.length - 1];
+                    File downloadDir = providedName.isEmpty() ? new File(nameFromUrl)
+                            : new File(providedName);
+                    downloadDir.createNewFile();
+                    System.out.println("Downloaded file to " + downloadDir.getAbsolutePath());
+                    out = new PrintStream(downloadDir);
+                }
+
+                if (flag.trim().equalsIgnoreCase("v")) isVerbose = true;
+            }
+
+            HttpClient httpClient = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofMinutes(1))
+                    .build();
+
+            HttpRequest request = HttpRequest.newBuilder(URI.create(args[0]))
+                    .method(method.toUpperCase(), bodyPublisher)
+                    .timeout(Duration.ofSeconds(30))
+                    .header("Accept", "*/*")
+                    .build();
+
+
+            HttpResponse<Stream<String>> response = httpClient.send(request,
+                    HttpResponse.BodyHandlers.ofLines());
+            if (isVerbose) {
+                response
+                        .headers()
+                        .map()
+                        .forEach((k, v) ->
+                                System.out.println(k + "=" + Arrays.toString(v.toArray())));
+            }
+
+            response.body().limit(2000).forEach(out::println);
+        } catch (ConnectException ex) {
+            System.err.println("Could not connect to internet");
+        } catch (HttpTimeoutException ex) {
+            System.err.println("Waiting for the response exceeded the timeout");
+        } catch (Exception ex) {
+            System.err.println(ex.getMessage());
+        } finally {
+            out.close();
+        }
+    }
+}
