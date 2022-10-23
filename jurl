@@ -27,11 +27,15 @@ public class Main {
 
             HttpRequest.BodyPublisher bodyPublisher = HttpRequest.BodyPublishers.noBody();
 
+            File downloadDir = null;
+
             String arguments = String.join(" ", args);
 
             String[] flags = arguments.split("-");
 
             boolean isVerbose = false;
+
+            boolean isDownloaded = false;
 
             for (String flag : flags) {
                 if (flag.trim().toLowerCase().startsWith("m")) {
@@ -44,13 +48,13 @@ public class Main {
                 }
 
                 if (flag.trim().toLowerCase().startsWith("d")) {
+                    isDownloaded = true;
                     String providedName = flag.substring(1).trim();
                     String[] entries = args[0].split("/");
                     String nameFromUrl = entries[entries.length - 1];
-                    File downloadDir = providedName.isEmpty() ? new File(nameFromUrl)
+                    downloadDir = providedName.isEmpty() ? new File(nameFromUrl)
                             : new File(providedName);
                     downloadDir.createNewFile();
-                    System.out.println("Downloaded file to " + downloadDir.getAbsolutePath());
                     out = new PrintStream(downloadDir);
                 }
 
@@ -79,6 +83,11 @@ public class Main {
             }
 
             response.body().limit(2000).forEach(out::println);
+
+            if(isDownloaded) {
+                System.out.println("Downloaded file to " + downloadDir.getAbsolutePath() + ". Installed " +
+                        downloadDir.length() + " bytes.");
+            }
         } catch (ConnectException ex) {
             System.err.println("Could not connect to internet");
         } catch (HttpTimeoutException ex) {
